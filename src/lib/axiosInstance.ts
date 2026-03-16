@@ -1,62 +1,66 @@
-import axios from 'axios';
+import axios, { AxiosInstance } from 'axios';
 
-// ─── Khởi tạo Instance Axios ──────────────────────────────────────────────────
-// Sử dụng JSONPlaceholder làm địa chỉ API giả lập (demo)
-const axiosInstance = axios.create({
-  baseURL: 'https://jsonplaceholder.typicode.com', // Địa chỉ gốc của API
-  timeout: 8000,                                   // Thời gian chờ tối đa 8 giây
-  headers: {
-    'Content-Type': 'application/json',            // Định nghĩa dữ liệu gửi đi là JSON
-  },
-});
+// ─── Kiểm tra môi trường (Environment guard) ──────────────────────────────────
+// Sử dụng biến môi trường của Vite để xác định đang ở chế độ Development hay Production
+const isDev = import.meta.env.DEV;
 
-// ─── Bộ chặn Request (Request Interceptor) ───────────────────────────────────
-// Chạy trước khi yêu cầu được gửi lên máy chủ
-axiosInstance.interceptors.request.use(
-  config => {
-    // Tự động gắn Token vào Header nếu tồn tại trong LocalStorage
-    // Tên key 'neonmech_token' rất phù hợp với phong cách dự án của bạn
-    const token = localStorage.getItem('neonmech_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+// ─── Hàm tạo Instance (Factory) ───────────────────────────────────────────────
+// Giúp tạo ra nhiều instance với cấu hình chung nhưng Base URL khác nhau
+function createInstance(baseURL: string): AxiosInstance {
+  const instance = axios.create({
+    baseURL,
+    timeout: 10_000, // Thời gian chờ tối đa 10 giây
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  // Bộ chặn yêu cầu gửi đi (Request interceptor)
+  instance.interceptors.request.use(
+    config => {
+      // Tự động đính kèm Token từ LocalStorage cho mọi yêu cầu
+      const token = localStorage.getItem('neonmech_token');
+      if (token) config.headers.Authorization = `Bearer ${token}`;
+
+      // ✅ Bảo mật: Chỉ log thông tin khi đang phát triển (isDev)
+      // Giúp không bị lộ URL hoặc cấu hình API nhạy cảm khi đã đóng gói (Production)
+      if (isDev) {
+        console.log(`[API →] ${config.method?.toUpperCase()} ${config.url}`);
+      }
+      return config;
+    },
+    error => Promise.reject(error)
+  );
+
+  // Bộ chặn phản hồi nhận về (Response interceptor)
+  instance.interceptors.response.use(
+    response => {
+      // ✅ Bảo mật: Chỉ log mã trạng thái (status code), không log dữ liệu phản hồi (body)
+      // Tránh việc dữ liệu người dùng bị hiển thị tràn lan trên Console trình duyệt
+      if (isDev) {
+        console.log(`[API ←] ${response.status} ${response.config.url}`);
+      }
+      return response;
+    },
+    error => {
+      const status = error.response?.status;
+      
+      // Xử lý khi Token hết hạn hoặc không hợp lệ (401)
+      if (status === 401) localStorage.removeItem('neonmech_token');
+
+      // ✅ Bảo mật: Không log thông báo lỗi chi tiết ra Console ở môi trường thực tế
+      // Ngăn chặn việc lộ cấu trúc Server hoặc Stack Trace cho người dùng cuối
+      if (isDev) {
+        console.warn(`[API ✗] status=${status ?? 'lỗi mạng'}`);
+      }
+      return Promise.reject(error);
     }
+  );
 
-    // Log thông tin request để dễ dàng debug trong quá trình phát triển
-    console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`, config.data ?? '');
-    
-    return config;
-  },
-  error => {
-    // Xử lý lỗi xảy ra trong quá trình gửi request
-    console.error('[API] Request error:', error);
-    return Promise.reject(error);
-  }
-);
+  return instance;
+}
 
-// ─── Bộ chặn Response (Response Interceptor) ──────────────────────────────────
-// Chạy ngay sau khi nhận được phản hồi từ máy chủ
-axiosInstance.interceptors.response.use(
-  response => {
-    // Log dữ liệu trả về để kiểm tra cấu trúc response
-    console.log(`[API] Response ${response.status}:`, response.data);
-    return response;
-  },
-  error => {
-    const status = error.response?.status; // Mã trạng thái lỗi (401, 404, 500...)
-    const message = error.response?.data?.message ?? error.message;
+// ─── Xuất các Instance cho từng mục đích sử dụng ──────────────────────────────
+// Instance dùng cho các tác vụ liên quan đến tài khoản/đăng nhập
+export const authAxios    = createInstance('https://jsonplaceholder.typicode.com');
 
-    // Xử lý riêng cho lỗi 401 (Hết hạn đăng nhập hoặc không có quyền)
-    if (status === 401) {
-      console.warn('[API] Unauthorized — Xóa token và yêu cầu đăng nhập lại');
-      localStorage.removeItem('neonmech_token');
-      // Bạn có thể thêm logic chuyển hướng người dùng về trang login ở đây:
-      // window.location.href = '/login';
-    }
-
-    // Log lỗi chi tiết từ máy chủ hoặc lỗi mạng
-    console.error(`[API] Error ${status ?? 'network'}:`, message);
-    return Promise.reject(error);
-  }
-);
-
-export default axiosInstance;
+// Instance dùng cho các tác vụ liên quan đến sản phẩm (Sử dụng API FakeStore)
+export const productAxios = createInstance('https://fakestoreapi.com');

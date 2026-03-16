@@ -1,4 +1,4 @@
-import axiosInstance from '../lib/axiosInstance';
+import { authAxios as axiosInstance } from '../lib/axiosInstance';
 import { User } from '../types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
