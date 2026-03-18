@@ -94,13 +94,13 @@ Những thông tin này tiết lộ cấu trúc hệ thống, giúp kẻ tấn c
 
 Trang Login có tính năng "Axios Log Terminal" — một widget debug hiển thị trực tiếp trên giao diện để developer theo dõi quá trình đăng nhập. Tuy nhiên, widget này cũng hiển thị cho **tất cả người dùng cuối**:
 
-**Vấn đề 3a** — Lộ chi tiết validation logic:
+**Vấn đề** — Lộ chi tiết validation logic:
 ```
 ❌ Validation failed: Mật khẩu phải có ít nhất 6 ký tự.
 ```
 Người dùng (hoặc kẻ tấn công) biết chính xác rule validation nào đang được áp dụng.
 
-**Vấn đề 3b** — Lộ raw error message từ network:
+**Vấn đề** — Lộ raw error message từ network:
 ```
 🔴 Network error: Request failed with status code 401
 ```
